@@ -520,7 +520,7 @@ public class Wiki implements Serializable
      */
     protected void initVars()
     {
-        StringBuilder basegen = new StringBuilder("https://");
+        StringBuilder basegen = new StringBuilder("http://");
         basegen.append(domain);
         basegen.append(scriptPath);
         StringBuilder apigen = new StringBuilder(basegen);        
@@ -529,9 +529,9 @@ public class Wiki implements Serializable
         // parameter]]. Let's exploit it.
         if (maxlag >= 0)
         {
-            apigen.append("maxlag=");
-            apigen.append(maxlag);
-            apigen.append("&");
+            // apigen.append("maxlag=");
+            // apigen.append(maxlag);
+            // apigen.append("&");
             basegen.append("/index.php?maxlag=");
             basegen.append(maxlag);
             basegen.append("&title=");
@@ -956,6 +956,8 @@ public class Wiki implements Serializable
                 throw new FailedLoginException("Login failed: incorrect password.");
             else if (line.contains("NotExists"))
                 throw new FailedLoginException("Login failed: user does not exist.");
+            else if (line.contains("Throttled"))
+                throw new FailedLoginException("Login failed: login Throttled.");
             throw new FailedLoginException("Login failed: unknown reason.");
         }
     }
@@ -2114,11 +2116,13 @@ public class Wiki implements Serializable
      *  @throws IOException if a network error occurs
      *  @since 0.24
      */
-    public String[] getLinksOnPage(String title) throws IOException
+    public String[] getLinksOnPage(String title, int max) throws IOException
     {
     	StringBuilder url = new StringBuilder(query);
-        url.append("prop=links&pllimit=max&titles=");
-        url.append(URLEncoder.encode(normalize(title), "UTF-8"));
+        url.append("prop=links");
+        url.append("&pllimit=").append(max);
+        url.append("&titles=").append(
+                URLEncoder.encode(normalize(title), "UTF-8"));
         String plcontinue = null;
         ArrayList<String> links = new ArrayList<String>(750);
         do
@@ -5645,7 +5649,9 @@ public class Wiki implements Serializable
             ret.put("blocked", info.contains("blockedby=\""));
             ret.put("emailable", info.contains("emailable=\""));
             ret.put("editcount", Integer.parseInt(parseAttribute(info, "editcount", 0)));
-            ret.put("gender", Gender.valueOf(parseAttribute(info, "gender", 0)));
+            String genderEnum = parseAttribute(info, "gender", 0);
+            ret.put("gender", genderEnum != null ? Gender.valueOf(genderEnum)
+                    : null);
             ret.put("created", timestampToCalendar(parseAttribute(info, "registration", 0), true));
             
             // groups
