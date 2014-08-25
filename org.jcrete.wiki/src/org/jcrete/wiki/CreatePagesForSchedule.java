@@ -20,7 +20,6 @@ import org.wikipedia.Wiki;
 
 /**
  * @author rgra
- *
  */
 public class CreatePagesForSchedule {
 
@@ -29,6 +28,8 @@ public class CreatePagesForSchedule {
     private static final List<String> IGNORE_PAGE_LIST = Arrays.asList(
             "JCrete2014:Breaking News", "JCrete2014:Hackathon",
             "JCrete2014:Outputs");
+
+    private static final String CONVENOR_KEYWORD = "Convenor:";
 
     private final int year;
     private final String pageNamespace;
@@ -42,15 +43,49 @@ public class CreatePagesForSchedule {
             throws IOException, LoginException {
         Wiki wiki = login(user, password);
 
+        String pageText = wiki.getPageText(getSchedulePageName());
+
         List<String> nonExistentPages = findNonExistentPagesInSchedule(wiki);
 
         for (String newPage : nonExistentPages) {
-            String title = newPage.substring(pageNamespace.length());
-            String convenor = "convenor";
-            String text = createTemplatePageText(title, convenor);
-            String summary = "JCrete " + year + " Schedule: " + title;
-            wiki.edit(newPage, text, summary);
+            createPage(wiki, pageText, newPage);
         }
+    }
+
+    private void createPage(Wiki wiki, String pageText, String pageName)
+            throws IOException, LoginException {
+        // '''[[JCrete2014:GargabeCollection|Garbage Collection: G1, Shenandoah
+        // etc.]]'''<br />Convenor: Fabian Lange, etc.<br />(discussion)
+        int index = pageText.indexOf(pageName);
+        if (index == -1) {
+            System.err.println("No reference found for page: " + pageName
+                    + ". Creation failed.");
+            return;
+        }
+        String title = getTitle(pageText, pageName, index);
+        String convenor = getConvenor(pageText, index);
+        String text = createTemplatePageText(title, convenor);
+        String summary = "JCrete " + year + " Schedule: " + title;
+        wiki.edit(pageName, text, summary);
+    }
+
+    private String getTitle(String pageText, String pageName,
+            int sessionStartIndexOnPage) {
+        // '''[[JCrete2014:GargabeCollection|Garbage Collection: G1, Shenandoah
+        // etc.]]
+        return pageText.substring(
+                sessionStartIndexOnPage + pageName.length() + 1,
+                pageText.indexOf("]]", sessionStartIndexOnPage)).trim();
+    }
+
+    private String getConvenor(String pageText, int sessionStartIndexOnPage) {
+        // Convenor: Fabian Lange, etc.<br />
+        int convenorStart = pageText.indexOf(CONVENOR_KEYWORD,
+                sessionStartIndexOnPage) + CONVENOR_KEYWORD.length();
+        int conventorEnd = pageText.indexOf("<br", convenorStart);
+        String convenor = pageText.substring(convenorStart, conventorEnd)
+                .trim();
+        return convenor;
     }
 
     private String createTemplatePageText(String title, String convenor) {
@@ -86,7 +121,8 @@ public class CreatePagesForSchedule {
             throws IOException {
 
         List<String> nonExistentPages = new ArrayList<>();
-        String[] links = wiki.getLinksOnPage(pageNamespace + "Schedule", 100);
+        String[] links = wiki.getLinksOnPage(getSchedulePageName(), 100);
+
         boolean[] existingCheck = wiki.exists(links);
         for (int i = 0; i < links.length; i++) {
             String link = links[i];
@@ -98,6 +134,10 @@ public class CreatePagesForSchedule {
         }
         nonExistentPages.removeAll(IGNORE_PAGE_LIST);
         return nonExistentPages;
+    }
+
+    private String getSchedulePageName() {
+        return pageNamespace + "Schedule";
     }
 
     private Wiki login(String user, String password)
